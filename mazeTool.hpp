@@ -1,4 +1,4 @@
-#include "../ml.h"
+#include "../src/modelTool/ml.h"
 #include <algorithm>
 #include <fstream>
 #include <string>
@@ -6,9 +6,6 @@
 #define BINDINGS
 #define PI 3.14159265358979323846264
 
-int floorCount = 20;
-float nodeDistance = 6.9f;
-float floorHeight = 1.1f;
 float entranceDistance = 1.6f;
 float hallWidth = 0.5;
 float hallHeight = 2.0;
@@ -28,9 +25,6 @@ struct ge
 
 void bindings()
 {
-	if (ImGui::SliderInt("floorCount", &floorCount, 2, 200))haveToGenerateModel = true;
-	if (ImGui::SliderFloat("nodeDistance", &nodeDistance, 0.1f, 20.0f))haveToGenerateModel = true;
-	if (ImGui::SliderFloat("floorHeight", &floorHeight, 0.1f, 20.0f))haveToGenerateModel = true;
 	if (ImGui::SliderFloat("entranceDistance", &entranceDistance, 0.1f, 20.0f))haveToGenerateModel = true;
 	if (ImGui::SliderFloat("hallWidth", &hallWidth, 0.1f, 3.0f))haveToGenerateModel = true;
 	if (ImGui::SliderFloat("hallHeight", &hallHeight, 0.1f, 5.0f))haveToGenerateModel = true;
@@ -135,7 +129,7 @@ vertices[edges.back().b].conn.push_back(edges.size() - 1)
 
 void readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
 {
-	std::ifstream is("in.obj");
+	std::ifstream is("assets/in.obj");
 	std::string str;
 	while (std::getline(is, str))
 	{
