@@ -7,8 +7,9 @@
 #define PI 3.14159265358979323846264
 
 float entranceDistance = 1.6f;
-float hallWidth = 0.5;
+float hallWidth = 1.0;
 float hallHeight = 2.0;
+bool closeTips = true;
 
 struct ge;
 struct gv
@@ -25,52 +26,9 @@ struct ge
 
 void bindings()
 {
-	if (ImGui::SliderFloat("entranceDistance", &entranceDistance, 0.1f, 20.0f))haveToGenerateModel = true;
+	if (ImGui::SliderFloat("entranceDistance", &entranceDistance, 0.1f, 10.0f))haveToGenerateModel = true;
 	if (ImGui::SliderFloat("hallWidth", &hallWidth, 0.1f, 3.0f))haveToGenerateModel = true;
 	if (ImGui::SliderFloat("hallHeight", &hallHeight, 0.1f, 5.0f))haveToGenerateModel = true;
-}
-
-void Cylinder(float radius, int steps, const vec& posA, const vec& posB, bool cap = true)
-{
-	using namespace ml;
-	vec dir = (posB - posA).Normalized();
-	dir.Normalize();
-	float test = dir.Dot(vec::up);
-	vec localRight = abs(test) == 1.0 ? vec::right : (dir * vec::up).Normalized();
-	vec localForward = (dir * localRight).Normalized();
-
-	float angleStep = 2.0 * PI / (double)steps;
-	unsigned int quad[4];
-	unsigned int* vertices = (unsigned int*)alloca(sizeof(unsigned int) * steps * 2);
-
-	unsigned int* capA = (unsigned int*)alloca(sizeof(unsigned int) * steps);
-	unsigned int* capB = (unsigned int*)alloca(sizeof(unsigned int) * steps);
-
-	for (int i = 0; i < steps; i++)
-	{
-		vertices[i * 2] = capA[i] = vertex(posA + localRight * cos(angleStep * i) * radius + localForward * sin(angleStep * i) * radius);
-		vertices[i * 2 + 1] = capB[i] = vertex(posB + localRight * cos(angleStep * i) * radius + localForward * sin(angleStep * i) * radius);
-
-		if (i > 0)
-		{
-			quad[0] = vertices[i * 2 - 2];
-			quad[1] = vertices[i * 2];
-			quad[2] = vertices[i * 2 + 1];
-			quad[3] = vertices[i * 2 - 1];
-			face(quad, 4);
-		}
-	}
-	quad[0] = quad[1];
-	quad[3] = quad[2];
-	quad[1] = vertices[0];
-	quad[2] = vertices[1];
-	face(quad, 4);
-
-	if (!cap)
-		return;
-
-	face(capA, steps);
-	face(capB, steps, true);
 }
 
 inline float cross2d(const vec& a, const vec& b)
@@ -113,19 +71,6 @@ vec intersectLines(const vec& pointA, const vec& pointB, const vec& dirA, const 
 #undef r
 #undef s
 }
-
-#define CREATE_VERTEX(theId, thePos) \
-vertices.emplace_back(); \
-vertices.back().pos = thePos; \
-vertices.back().id = theId
-
-#define CONNECT(theA, theB) \
-edges.emplace_back(); \
-edges.back().a = theA; \
-edges.back().b = theB; \
-vertices[edges.back().a].conn.push_back(edges.size() - 1); \
-vertices[edges.back().b].conn.push_back(edges.size() - 1)
-
 
 void readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
 {
@@ -182,7 +127,7 @@ void generateModel()
 	for (int i = 0; i < vertices.size(); i++)
 		modelVertexMatrix[i] = new unsigned int[vertices.size()];
 
-	for (int i = 0; i < vertices.size(); i++) // intersections
+	for (int i = 0; i < vertices.size(); i++) // geometry for each intersection
 	{
 		std::vector<std::pair<int, float>> vertexAngle;
 		for (const int conn : vertices[i].conn)
@@ -209,8 +154,16 @@ void generateModel()
 			direction.Normalize();
 			vec right = direction.Cross(vec::up).Normalized();
 
-			vec entrancePosA = vertices[i].pos + direction * entranceDistance - right * hallWidth;
-			vec entrancePosB = vertices[i].pos + direction * entranceDistance + right * hallWidth;
+			float halfHallWidth = hallWidth * 0.5f;
+
+			vec entrancePosA = vertices[i].pos - right * halfHallWidth;
+			vec entrancePosB = vertices[i].pos + right * halfHallWidth;
+			if (vertexAngle.size() != 1)
+			{
+				entrancePosA += direction * entranceDistance;
+				entrancePosB += direction * entranceDistance;
+			}
+
 			if (index == 0)
 			{
 				firstPos = entrancePosA;
@@ -218,7 +171,6 @@ void generateModel()
 			}
 
 			floorVerts.push_back(ml::vertex(entrancePosA));
-
 			modelVertexMatrix[i][p.first] = floorVerts[floorVerts.size() - 1];
 			floorVerts.push_back(ml::vertex(entrancePosB));
 			ceilingVerts.push_back(ml::vertex(entrancePosA + vec::up * hallHeight));
@@ -234,7 +186,7 @@ void generateModel()
 				nextDirection.y = 0.0;
 				nextDirection.Normalize();
 				vec nextRight = nextDirection.Cross(vec::up).Normalized();
-				vec nextPos = vertices[i].pos + nextDirection * entranceDistance - nextRight * hallWidth;
+				vec nextPos = vertices[i].pos + nextDirection * entranceDistance - nextRight * halfHallWidth;
 				floorVerts.push_back(ml::vertex(intersectLines(entrancePosB, nextPos, -direction, -nextDirection)));
 				ceilingVerts.push_back(ml::vertex(intersectLines(entrancePosB, nextPos, -direction, -nextDirection) + vec::up * hallHeight));
 			}
@@ -275,7 +227,7 @@ void generateModel()
 			std::cout << "  " << p.second * 180.0 / PI << std::endl;
 		}*/
 	}
-	for (int i = 0; i < vertices.size(); i++) // halls
+	for (int i = 0; i < vertices.size(); i++) // hall faces connecting each intersection
 	{
 		for (const int conn : vertices[i].conn)
 		{
