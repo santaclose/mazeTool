@@ -1,11 +1,6 @@
 # mazeTool
 
-This is a piece of code intended to help generate maze geometry for games. It receives a wireframe obj file containing the skeleton of the maze and generates its final geometry.
+This code generates maze geometry from an obj wireframe.
 
-Example Input:
-![alt 
-text](https://raw.githubusercontent.com/santaclose/mazeTool/master/exampleInput.png)
-
-Example Output:
-![alt 
-text](https://raw.githubusercontent.com/santaclose/mazeTool/master/exampleOutput.png)
+Example input on the left and output on the right:
+![example](https://raw.githubusercontent.com/santaclose/mazeTool/master/example.png)
