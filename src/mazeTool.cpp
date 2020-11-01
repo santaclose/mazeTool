@@ -150,6 +150,7 @@ void Model::GenerateModel()
 				ceilingVerts.push_back(ml::vertex(Geometry::intersectLines(entrancePosB, nextPos, -direction, -nextDirection) + vec::up * hallHeight));
 			}
 
+			ml::setMaterial("wall");
 			unsigned int quad[4];
 			quad[0] = floorVerts.back();
 			quad[1] = ceilingVerts.back();
@@ -175,14 +176,16 @@ void Model::GenerateModel()
 
 			index++;
 		}
-		ml::concaveFace(&floorVerts[0], floorVerts.size(), true);
 		ml::concaveFace(&ceilingVerts[0], ceilingVerts.size(), false);
+		ml::setMaterial("floor");
+		ml::concaveFace(&floorVerts[0], floorVerts.size(), true);
 	}
 
 	for (int i = 0; i < vertices.size(); i++) // hall faces connecting each intersection
 	{
 		for (const int conn : vertices[i].conn)
 		{
+			ml::setMaterial("wall");
 			int adjVertex = edges[conn].a == i ? edges[conn].b : edges[conn].a;
 			unsigned int gate1 = modelVertexMatrix[i][adjVertex];
 			unsigned int gate2 = modelVertexMatrix[adjVertex][i];
@@ -192,16 +195,17 @@ void Model::GenerateModel()
 			quad[2] = gate2 + 3;
 			quad[3] = gate1 + 2;
 			ml::face(quad, 4);
-			quad[0] = gate1;
-			quad[1] = gate1 + 1;
-			quad[2] = gate2;
-			quad[3] = gate2 + 1;
-			ml::face(quad, 4);
 			quad[0] = gate1 + 2;
 			quad[1] = gate1 + 3;
 			quad[2] = gate2 + 2;
 			quad[3] = gate2 + 3;
 			ml::face(quad, 4, true);
+			ml::setMaterial("floor");
+			quad[0] = gate1;
+			quad[1] = gate1 + 1;
+			quad[2] = gate2;
+			quad[3] = gate2 + 1;
+			ml::face(quad, 4);
 		}
 	}
 }
