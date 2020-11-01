@@ -1,80 +1,37 @@
-#include "../src/modelTool/ml.h"
+#include <Model.h>
+#include <modelTool/ml.h>
+
 #include <algorithm>
 #include <fstream>
 #include <string>
-#define MODEL_SET
-#define BINDINGS
-#define PI 3.14159265358979323846264
+#include <imgui.h>
 
-float entranceDistance = 1.6f;
+#include "Wireframe.h"
+#include "Geometry.h"
+
+char fileName[256] = "assets/input/test.obj";
+float inputScale = 1.0f;
+float intersectionMargin = 1.6f;
 float hallWidth = 1.0;
 float hallHeight = 2.0;
 bool closeTips = true;
 
-struct ge;
-struct gv
+void Model::Bindings(bool& haveToGenerateModel)
 {
-	int id;
-	std::vector<int> conn;
-	vec pos;
-};
-struct ge
-{
-	int a;
-	int b;
-};
-
-void bindings()
-{
-	if (ImGui::SliderFloat("entranceDistance", &entranceDistance, 0.1f, 10.0f))haveToGenerateModel = true;
-	if (ImGui::SliderFloat("hallWidth", &hallWidth, 0.1f, 3.0f))haveToGenerateModel = true;
-	if (ImGui::SliderFloat("hallHeight", &hallHeight, 0.1f, 5.0f))haveToGenerateModel = true;
+	if (ImGui::InputText("File name", fileName, 256)) haveToGenerateModel = true;
+	BIND(SliderFloat, "Input scale", &inputScale, 0.1f, 10.0f);
+	BIND(SliderFloat, "Intersection margin", &intersectionMargin, 0.1f, 10.0f);
+	BIND(SliderFloat, "Hall width", &hallWidth, 0.1f, 3.0f);
+	BIND(SliderFloat, "Hall height", &hallHeight, 0.1f, 5.0f);
 }
 
-inline float cross2d(const vec& a, const vec& b)
-{
-	return a.x * b.z - a.z * b.x;
-}
-inline float dot2d(const vec& a, const vec& b)
-{
-	return a.x * b.x + a.z * b.z;
-}
 
-vec intersectLines(const vec& pointA, const vec& pointB, const vec& dirA, const vec& dirB)
+bool readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
 {
-	if (abs(dot2d(dirA.Normalized(), dirB.Normalized())) > 0.95)
-	{
-		return (pointA + pointB) * 0.5;
-	}
+	std::ifstream is(fileName);
+	if (is.fail())
+		return false;
 
-#define p pointA
-#define q pointB
-#define r dirA
-#define s dirB
-	vec qp = q - p;
-	float rs = cross2d(r, s);
-
-	vec result;
-	if (rs != 0.0 && cross2d(qp, r) != 0.0)
-	{
-		float t = cross2d(qp, s) / rs;
-		float u = cross2d(qp, r) / rs;
-		result = (p + (r * t) + q + (s * u)) * 0.5;
-	}
-	else
-	{
-		result = (p + q) * 0.5;
-	}
-	return result;
-#undef p
-#undef q
-#undef r
-#undef s
-}
-
-void readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
-{
-	std::ifstream is("assets/in.obj");
 	std::string str;
 	while (std::getline(is, str))
 	{
@@ -94,9 +51,9 @@ void readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
 			cp = cq;
 			while (cp < str.length() && str[cp] != ' ' && str[cp] != '\n')cp++;
 			vertices.emplace_back();
-			vertices.back().pos.x = std::stof(str.substr(aq, ap - aq));
-			vertices.back().pos.y = std::stof(str.substr(bq, bp - bq));
-			vertices.back().pos.z = std::stof(str.substr(cq, cp - cq));
+			vertices.back().pos.x = std::stof(str.substr(aq, ap - aq)) * inputScale;
+			vertices.back().pos.y = std::stof(str.substr(bq, bp - bq)) * inputScale;
+			vertices.back().pos.z = std::stof(str.substr(cq, cp - cq)) * inputScale;
 		}
 		else if (str[0] == 'l')
 		{
@@ -114,14 +71,16 @@ void readOBJ(std::vector<gv>& vertices, std::vector<ge>& edges)
 			vertices[edges.back().b].conn.push_back(edges.size() - 1);
 		}
 	}
+	return true;
 }
 
-void generateModel()
+void Model::GenerateModel()
 {
 	std::vector<gv> vertices;
 	std::vector<ge> edges;
 
-	readOBJ(vertices, edges);
+	if (!readOBJ(vertices, edges))
+		return;
 
 	unsigned int** modelVertexMatrix = new unsigned int*[vertices.size()];
 	for (int i = 0; i < vertices.size(); i++)
@@ -160,8 +119,8 @@ void generateModel()
 			vec entrancePosB = vertices[i].pos + right * halfHallWidth;
 			if (vertexAngle.size() != 1)
 			{
-				entrancePosA += direction * entranceDistance;
-				entrancePosB += direction * entranceDistance;
+				entrancePosA += direction * intersectionMargin;
+				entrancePosB += direction * intersectionMargin;
 			}
 
 			if (index == 0)
@@ -177,8 +136,8 @@ void generateModel()
 			ceilingVerts.push_back(ml::vertex(entrancePosB + vec::up * hallHeight));
 			if (index == vertexAngle.size() - 1)
 			{
-				floorVerts.push_back(ml::vertex(intersectLines(entrancePosB, firstPos, -direction, -firstDir)));
-				ceilingVerts.push_back(ml::vertex(intersectLines(entrancePosB, firstPos, -direction, -firstDir) + vec::up * hallHeight));
+				floorVerts.push_back(ml::vertex(Geometry::intersectLines(entrancePosB, firstPos, -direction, -firstDir)));
+				ceilingVerts.push_back(ml::vertex(Geometry::intersectLines(entrancePosB, firstPos, -direction, -firstDir) + vec::up * hallHeight));
 			}
 			else
 			{
@@ -186,9 +145,9 @@ void generateModel()
 				nextDirection.y = 0.0;
 				nextDirection.Normalize();
 				vec nextRight = nextDirection.Cross(vec::up).Normalized();
-				vec nextPos = vertices[i].pos + nextDirection * entranceDistance - nextRight * halfHallWidth;
-				floorVerts.push_back(ml::vertex(intersectLines(entrancePosB, nextPos, -direction, -nextDirection)));
-				ceilingVerts.push_back(ml::vertex(intersectLines(entrancePosB, nextPos, -direction, -nextDirection) + vec::up * hallHeight));
+				vec nextPos = vertices[i].pos + nextDirection * intersectionMargin - nextRight * halfHallWidth;
+				floorVerts.push_back(ml::vertex(Geometry::intersectLines(entrancePosB, nextPos, -direction, -nextDirection)));
+				ceilingVerts.push_back(ml::vertex(Geometry::intersectLines(entrancePosB, nextPos, -direction, -nextDirection) + vec::up * hallHeight));
 			}
 
 			unsigned int quad[4];
@@ -216,17 +175,10 @@ void generateModel()
 
 			index++;
 		}
-		ml::face(&floorVerts[0], floorVerts.size(), true);
-		ml::face(&ceilingVerts[0], ceilingVerts.size(), false);
-
-		/*std::cout << std::endl << vertices[i].id << ":\n";
-		std::cout << vertices[i].pos.x << "," << vertices[i].pos.z << std::endl;
-		for (const std::pair<int, float>& p : vertexAngle)
-		{
-			std::cout << "  " << vertices[p.first].pos.x << "," << vertices[p.first].pos.z << std::endl;
-			std::cout << "  " << p.second * 180.0 / PI << std::endl;
-		}*/
+		ml::concaveFace(&floorVerts[0], floorVerts.size(), true);
+		ml::concaveFace(&ceilingVerts[0], ceilingVerts.size(), false);
 	}
+
 	for (int i = 0; i < vertices.size(); i++) // hall faces connecting each intersection
 	{
 		for (const int conn : vertices[i].conn)
