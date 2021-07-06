@@ -1,6 +1,6 @@
 # mazeTool
 
-This code generates maze geometry from an obj wireframe.
+This code generates 3D maze geometry either from a wireframe given in obj format or randomly.
 
 Example input on the left and output on the right:
-![example](https://raw.githubusercontent.com/santaclose/mazeTool/master/example.png)
+![example](https://raw.githubusercontent.com/santaclose/mazeTool/master/image.png)
